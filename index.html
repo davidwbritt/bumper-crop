@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bumper Crop</title>
+<meta name="description" content="A penny-arcade orchard machine: drop apples through brass pegs, ring the bumpers, land the big baskets. Upgrade, nudge — but don't TILT. Free, offline, one file.">
+<meta property="og:title" content="Bumper Crop — a penny-arcade orchard machine">
+<meta property="og:description" content="Drop apples. Ring bumpers. Don't TILT. One more ball.">
+<meta property="og:type" content="website">
+<style>
+  :root{
+    --wood:#5a3a22;
+    --wood-dark:#3d2614;
+    --wood-lite:#7a5433;
+    --board:#f3e9d0;
+    --board-line:#d9cbaa;
+    --brass:#c9a24a;
+    --brass-lite:#eed488;
+    --apple:#b4342a;
+    --leaf:#4a6b3a;
+    --ink:#2c2114;
+    --gold:#e0b64f;
+    --display:'Didot','Bodoni MT','Playfair Display','Baskerville','Times New Roman',serif;
+    --util:'Optima','Candara','Gill Sans','Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  /* itch.io embeds block viewport scrolling; constrain the root so the body scrolls itself */
+  html.embedded{height:100%;overflow:hidden}
+  html.embedded body{height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  body{
+    background:
+      radial-gradient(900px 500px at 50% -10%, rgba(238,212,136,.08), transparent 60%),
+      #241a10;
+    color:var(--board);
+    font-family:var(--util);
+    display:flex;align-items:flex-start;justify-content:center;
+    padding:18px 10px 40px;
+    overflow-y:auto;
+  }
+  .cab{
+    background:linear-gradient(175deg, var(--wood-lite), var(--wood) 30%, var(--wood-dark));
+    border-radius:14px;
+    padding:14px 16px 12px;
+    box-shadow:0 30px 60px -24px rgba(0,0,0,.9), inset 0 2px 0 rgba(238,212,136,.25);
+    max-width:1020px;width:100%;
+    display:grid;grid-template-columns:minmax(300px,520px) minmax(230px,300px);
+    gap:14px;justify-content:center;
+  }
+  .marquee{
+    grid-column:1 / -1;
+    background:linear-gradient(180deg,#20160c,#33220f);
+    border:2px solid var(--brass);border-radius:8px;
+    padding:10px 18px;
+    display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;
+    box-shadow:inset 0 0 24px rgba(0,0,0,.6);
+  }
+  .marquee h1{
+    font-family:var(--display);font-weight:500;font-size:clamp(22px,4vw,34px);
+    color:var(--brass-lite);letter-spacing:.04em;
+    text-shadow:0 0 18px rgba(238,212,136,.35);
+  }
+  .marquee .tag{font-size:10px;letter-spacing:.26em;text-transform:uppercase;color:#9b7d45}
+  .marquee .spacer{flex:1}
+  .lcd{
+    font-family:var(--util);font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#9b7d45;
+  }
+  .lcd b{
+    color:var(--brass-lite);font-size:20px;letter-spacing:.06em;
+    text-shadow:0 0 12px rgba(238,212,136,.4);
+    font-variant-numeric:tabular-nums;
+  }
+  .playfield{position:relative}
+  canvas{
+    display:block;width:100%;height:auto;
+    background:var(--board);
+    border:3px solid var(--brass);
+    border-radius:8px;
+    box-shadow:inset 0 8px 30px rgba(60,40,10,.25);
+    cursor:crosshair;
+    touch-action:none;
+  }
+  .cab.shake .playfield{animation:shake .18s}
+  @keyframes shake{0%{transform:translate(0)}25%{transform:translate(-5px,2px)}55%{transform:translate(4px,-2px)}100%{transform:translate(0)}}
+  #tiltbanner{
+    position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(30,15,8,.72);border-radius:8px;z-index:5;
+    font-family:var(--display);font-size:64px;color:#ff5b4a;letter-spacing:.2em;
+    text-shadow:0 0 30px rgba(255,91,74,.7);
+  }
+  #tiltbanner.on{display:flex;animation:tiltblink .5s steps(2) infinite}
+  @keyframes tiltblink{50%{opacity:.55}}
+
+  .controls{
+    display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap;
+  }
+  .controls button{
+    background:linear-gradient(180deg,#33220f,#20160c);
+    border:1.5px solid var(--brass);border-radius:6px;color:var(--brass-lite);
+    font-family:var(--util);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+    padding:9px 14px;cursor:pointer;
+  }
+  .controls button:hover{background:#3d2a12}
+  .controls button:disabled{opacity:.4;cursor:default}
+  .controls .hopper{
+    font-size:16px;letter-spacing:4px;color:var(--apple);
+    background:var(--board);border:1.5px solid var(--brass);border-radius:6px;
+    padding:6px 12px;min-width:110px;text-align:center;
+  }
+  .controls .spacer{flex:1}
+
+  .shop{
+    background:linear-gradient(180deg,#2a1c0e,#1e1409);
+    border:2px solid var(--brass);border-radius:8px;
+    padding:14px;align-self:start;
+  }
+  .shop h2{
+    font-family:var(--util);font-weight:400;font-size:11px;letter-spacing:.3em;
+    text-transform:uppercase;color:var(--brass-lite);
+    border-bottom:1px solid rgba(201,162,74,.4);padding-bottom:8px;margin-bottom:10px;
+    display:flex;justify-content:space-between;
+  }
+  .shop .item{
+    display:flex;align-items:center;gap:10px;
+    padding:8px 0;border-bottom:1px dotted rgba(201,162,74,.25);
+  }
+  .shop .item .info{flex:1;min-width:0}
+  .shop .item .nm{font-size:12.5px;color:var(--board);letter-spacing:.04em}
+  .shop .item .ds{font-size:10.5px;color:#9b7d45;line-height:1.4}
+  .shop .item button{
+    background:linear-gradient(180deg,var(--brass),#9b7a35);
+    border:none;border-radius:5px;color:#20160c;
+    font-family:var(--util);font-size:10.5px;letter-spacing:.06em;font-weight:600;
+    padding:7px 10px;cursor:pointer;white-space:nowrap;
+    min-width:74px;
+  }
+  .shop .item button:hover{filter:brightness(1.12)}
+  .shop .item button:disabled{opacity:.35;cursor:default;filter:none}
+  .shop .lvl{font-size:9px;letter-spacing:.14em;color:#9b7d45}
+
+  footer{
+    grid-column:1 / -1;
+    display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;
+    font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:#9b7d45;
+    padding:8px 6px 2px;
+  }
+  footer a,footer button.lk{
+    color:var(--brass-lite);text-decoration:none;background:none;border:none;
+    font:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer;
+    text-decoration:underline;text-underline-offset:3px;
+  }
+  .toast{
+    position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:50;
+    background:var(--board);color:var(--ink);padding:10px 20px;border-radius:4px;
+    font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    box-shadow:0 14px 30px -10px rgba(0,0,0,.8);
+  }
+  @media (max-width:820px){
+    .cab{grid-template-columns:1fr}
+    .shop{order:3}
+  }
+</style>
+</head>
+<body>
+<div class="cab" id="cab">
+  <div class="marquee">
+    <h1>Bumper Crop</h1>
+    <span class="tag">Penny Arcade · Est. Whenever</span>
+    <span class="spacer"></span>
+    <span class="lcd">Coins <b id="lcd-coins">0</b></span>
+    <span class="lcd">Best drop <b id="lcd-best">0</b></span>
+  </div>
+
+  <div>
+    <div class="playfield">
+      <canvas id="pf" width="480" height="680" aria-label="The orchard machine"></canvas>
+      <div id="tiltbanner">TILT</div>
+    </div>
+    <div class="controls">
+      <span class="hopper" id="hopper" title="Apples in the hopper">●●●</span>
+      <button id="btn-nudge" style="display:none" title="Shove the cabinet (N). Three in quick order and she TILTs.">Nudge (N)</button>
+      <span class="spacer"></span>
+      <button id="btn-daily" title="Same board for everyone, new at midnight UTC">Daily board</button>
+      <button id="btn-new" title="A fresh peg layout">New board</button>
+      <button id="btn-share" title="Copy this board’s permanent address">Share</button>
+      <button id="btn-mute">Sound: on</button>
+    </div>
+  </div>
+
+  <aside class="shop">
+    <h2><span>The Back Counter</span><span id="shop-coins"></span></h2>
+    <div id="shop-items"></div>
+  </aside>
+
+  <footer>
+    <span>Board “<span id="f-seed"></span>” · same seed, same pegs, forever</span>
+    <span>no accounts · no ads · by <a href="https://clevermonkey.itch.io/">clevermonkey</a> · <a href="https://ko-fi.com/clevermonkey">tip the machine ♥</a></span>
+  </footer>
+</div>
+
+<script>
+'use strict';
+
+/* ================= seeded randomness (board layout only) ================= */
+function xmur3(str){
+  let h = 1779033703 ^ str.length;
+  for (let i = 0; i < str.length; i++){
+    h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
+  return function(){
+    h = Math.imul(h ^ (h >>> 16), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return (h ^= h >>> 16) >>> 0;
+  };
+}
+function mulberry32(a){
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function makeRng(s){ const h = xmur3(s); return mulberry32(h()); }
+function pick(rng, arr){ return arr[Math.floor(rng() * arr.length)]; }
+function rint(rng, a, b){ return a + Math.floor(rng() * (b - a + 1)); }
+function chance(rng, p){ return rng() < p; }
+function shuffle(rng, arr){
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--){
+    const j = Math.floor(rng() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+const R = Math.random;
+
+const SEED_A = ['orchard', 'cider', 'russet', 'pippin', 'bramley', 'windfall', 'harvest', 'scrumpy'];
+const SEED_B = ['lane', 'row', 'field', 'press', 'loft', 'gate', 'fair', 'moot'];
+function randomSeed(){
+  return SEED_A[Math.floor(R() * SEED_A.length)] + '-' + SEED_B[Math.floor(R() * SEED_B.length)] + '-' + Math.floor(R() * 900 + 100);
+}
+
+/* ================= sound: tiny synth, no assets ================= */
+let AC = null, muted = false;
+function ac(){
+  if (!AC){
+    try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e){ AC = null; }
+  }
+  return AC;
+}
+function tone(freq, dur, type, vol, slide){
+  if (muted) return;
+  const ctx = ac();
+  if (!ctx) return;
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(freq, ctx.currentTime);
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, freq * slide), ctx.currentTime + dur);
+  g.gain.setValueAtTime(vol || 0.08, ctx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
+  o.connect(g); g.connect(ctx.destination);
+  o.start(); o.stop(ctx.currentTime + dur + 0.02);
+}
+const SFX = {
+  peg(){ tone(1100 + R() * 500, 0.05, 'triangle', 0.05); },
+  bumper(){ tone(180 + R() * 60, 0.16, 'square', 0.09, 2.2); },
+  basket(mult){
+    const base = 420 + Math.min(6, mult) * 60;
+    tone(base, 0.12, 'sine', 0.09);
+    setTimeout(() => tone(base * 1.25, 0.12, 'sine', 0.08), 70);
+    if (mult >= 5) setTimeout(() => tone(base * 1.5, 0.2, 'sine', 0.09), 140);
+  },
+  drop(){ tone(300, 0.06, 'sine', 0.05, 0.7); },
+  buy(){ tone(700, 0.09, 'triangle', 0.08); setTimeout(() => tone(1050, 0.12, 'triangle', 0.08), 60); },
+  nudge(){ tone(90, 0.12, 'square', 0.1, 0.8); },
+  tilt(){ tone(120, 0.5, 'sawtooth', 0.1, 0.5); setTimeout(() => tone(90, 0.6, 'sawtooth', 0.09, 0.5), 220); },
+  gold(){ tone(1300, 0.3, 'sine', 0.07, 1.4); }
+};
+
+/* ================= the board ================= */
+const W = 480, H = 680;
+const BALL_R = 7, PEG_R = 5, BUMP_R = 17;
+const GRAV = 980, REST_PEG = 0.72, REST_WALL = 0.6, MAXV = 950;
+const SLOT_N = 7, SLOT_W = W / SLOT_N, SLOT_TOP = 596;
+
+let B = null;   /* the board (seeded) */
+
+function buildBoard(seed){
+  const rng = makeRng('board:' + seed);
+  const board = { seed, pegs: [], bumpers: [], slots: [] };
+  /* pegs: staggered rows with seeded gaps and jitter */
+  const rows = 8, y0 = 150, dy = 44;
+  for (let r = 0; r < rows; r++){
+    const off = (r % 2) ? 22 : 0;
+    for (let x = 36 + off; x <= W - 30; x += 44){
+      if (chance(rng, 0.12)) continue;           /* seeded lanes */
+      board.pegs.push({
+        x: x + rint(rng, -4, 4),
+        y: y0 + r * dy + rint(rng, -3, 3),
+        flash: 0
+      });
+    }
+  }
+  /* bumpers: three, spread out, not too close to pegs' spirit (pegs near them get culled) */
+  let guard = 0;
+  while (board.bumpers.length < 3 && guard++ < 200){
+    const bx = rint(rng, 70, W - 70), by = rint(rng, 195, 460);
+    if (board.bumpers.some(b => (b.x - bx) ** 2 + (b.y - by) ** 2 < 130 * 130)) continue;
+    board.bumpers.push({ x: bx, y: by, flash: 0 });
+  }
+  board.pegs = board.pegs.filter(p => !board.bumpers.some(b => (b.x - p.x) ** 2 + (b.y - p.y) ** 2 < (BUMP_R + PEG_R + 14) ** 2));
+  /* baskets: seeded multiplier order, always one big one */
+  board.slots = shuffle(rng, [10, 5, 3, 2, 1, 1, 2]);
+  return board;
+}
+
+/* ================= game state (global, persists across boards) ================= */
+const DEFAULT_SAVE = {
+  coins: 0, best: 0, muted: false,
+  up: { hopper: 0, regen: 0, bumper: 0, gold: 0, split: 0, nudge: 0 }
+};
+let S = null;      /* save */
+let balls = [];
+let hopper = 3;
+let regenAt = 0;
+let aimX = W / 2;
+let popups = [];
+let tiltHeat = 0, tiltedUntil = 0, lastNudges = [];
+
+function hopperCap(){ return 3 + S.up.hopper; }
+function regenMs(){ return Math.max(900, 4000 * Math.pow(0.85, S.up.regen)); }
+function bumperVal(){ return 25 + 12 * S.up.bumper; }
+function goldChance(){ return 0.04 * S.up.gold; }
+function splitChance(){ return 0.05 * S.up.split; }
+function tilted(){ return performance.now() < tiltedUntil; }
+
+/* ================= physics ================= */
+function dropBall(){
+  if (tilted() || hopper <= 0 || balls.length > 14) return;
+  hopper--;
+  const golden = R() < goldChance();
+  balls.push({
+    x: Math.max(BALL_R + 4, Math.min(W - BALL_R - 4, aimX)),
+    y: 96, vx: (R() - 0.5) * 30, vy: 40,
+    score: 0, golden, dead: false
+  });
+  SFX.drop();
+  if (golden) SFX.gold();
+  renderHopper();
+}
+
+function step(dt){
+  const now = performance.now();
+  /* hopper regen */
+  if (hopper < hopperCap() && now >= regenAt){
+    hopper++;
+    regenAt = now + regenMs();
+    renderHopper();
+  }
+  /* tilt heat cools */
+  tiltHeat = Math.max(0, tiltHeat - dt * 0.28);
+
+  for (const b of balls){
+    if (b.dead) continue;
+    b.vy += GRAV * dt;
+    const sp = Math.hypot(b.vx, b.vy);
+    if (sp > MAXV){ b.vx = b.vx / sp * MAXV; b.vy = b.vy / sp * MAXV; }
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+
+    /* walls */
+    if (b.x < BALL_R){ b.x = BALL_R; b.vx = Math.abs(b.vx) * REST_WALL; }
+    if (b.x > W - BALL_R){ b.x = W - BALL_R; b.vx = -Math.abs(b.vx) * REST_WALL; }
+    if (b.y < BALL_R){ b.y = BALL_R; b.vy = Math.abs(b.vy) * REST_WALL; }
+
+    /* pegs */
+    for (const p of B.pegs){
+      const dx = b.x - p.x, dy = b.y - p.y;
+      const d2 = dx * dx + dy * dy, rr = BALL_R + PEG_R;
+      if (d2 < rr * rr && d2 > 0.0001){
+        const d = Math.sqrt(d2), nx = dx / d, ny = dy / d;
+        b.x = p.x + nx * rr; b.y = p.y + ny * rr;
+        const dot = b.vx * nx + b.vy * ny;
+        if (dot < 0){
+          b.vx -= (1 + REST_PEG) * dot * nx;
+          b.vy -= (1 + REST_PEG) * dot * ny;
+          b.vx += (R() - 0.5) * 26;   /* a little organic scatter */
+          if (p.flash <= 0){ b.score += 1; SFX.peg(); }
+          p.flash = 0.12;
+        }
+      }
+    }
+    /* bumpers */
+    for (const p of B.bumpers){
+      const dx = b.x - p.x, dy = b.y - p.y;
+      const d2 = dx * dx + dy * dy, rr = BALL_R + BUMP_R;
+      if (d2 < rr * rr && d2 > 0.0001){
+        const d = Math.sqrt(d2), nx = dx / d, ny = dy / d;
+        b.x = p.x + nx * rr; b.y = p.y + ny * rr;
+        if (!tilted()){
+          const kick = 430;
+          b.vx = nx * kick + (R() - 0.5) * 60;
+          b.vy = ny * kick - 60;
+          b.score += bumperVal();
+          popup(p.x, p.y - BUMP_R - 8, '+' + bumperVal(), '#b4342a');
+          p.flash = 0.22;
+          SFX.bumper();
+          if (R() < splitChance() && balls.length < 14){
+            balls.push({ x: b.x, y: b.y, vx: -b.vx * 0.7, vy: -120, score: 0, golden: false, dead: false });
+            popup(b.x, b.y - 18, 'SPLIT!', '#4a6b3a');
+          }
+        } else {
+          /* tilted: bumpers are dead rubber */
+          const dot = b.vx * nx + b.vy * ny;
+          if (dot < 0){ b.vx -= 1.4 * dot * nx; b.vy -= 1.4 * dot * ny; }
+        }
+      }
+    }
+    /* basket dividers: simple vertical walls from SLOT_TOP down */
+    if (b.y > SLOT_TOP - BALL_R){
+      const k = Math.round(b.x / SLOT_W);
+      const wallX = k * SLOT_W;
+      if (k > 0 && k < SLOT_N && Math.abs(b.x - wallX) < BALL_R + 2){
+        b.x = wallX + Math.sign(b.x - wallX || 1) * (BALL_R + 2);
+        b.vx = -b.vx * 0.5;
+      }
+    }
+    /* landed */
+    if (b.y > H - BALL_R - 6){
+      b.dead = true;
+      const slot = Math.max(0, Math.min(SLOT_N - 1, Math.floor(b.x / SLOT_W)));
+      const mult = B.slots[slot];
+      let payout = Math.max(1, b.score) * mult;
+      if (b.golden) payout *= 5;
+      S.coins += payout;
+      S.best = Math.max(S.best, payout);
+      bumpBest(payout);
+      popup(b.x, H - 40, '+' + payout + (b.golden ? ' ✦' : ''), b.golden ? '#e0b64f' : '#2c2114');
+      SFX.basket(mult);
+      save();
+      renderLCD();
+      renderShop();
+    }
+  }
+  balls = balls.filter(b => !b.dead);
+  for (const p of B.pegs) p.flash = Math.max(0, p.flash - dt);
+  for (const p of B.bumpers) p.flash = Math.max(0, p.flash - dt);
+  for (const q of popups){ q.t += dt; q.y -= 34 * dt; }
+  popups = popups.filter(q => q.t < 1.1);
+}
+
+function popup(x, y, text, color){
+  popups.push({ x, y, text, color, t: 0 });
+}
+
+/* nudge: the pinball inheritance */
+function nudge(){
+  if (!S.up.nudge || tilted()) return;
+  const now = performance.now();
+  lastNudges = lastNudges.filter(t => now - t < 4000);
+  lastNudges.push(now);
+  const dir = aimX < W / 2 ? 1 : -1;
+  for (const b of balls){
+    b.vx += dir * (110 + R() * 70);
+    b.vy -= 70 + R() * 40;
+  }
+  SFX.nudge();
+  const cab = document.getElementById('cab');
+  cab.classList.remove('shake');
+  void cab.offsetWidth;
+  cab.classList.add('shake');
+  if (lastNudges.length >= 4){
+    tiltedUntil = now + 6000;
+    lastNudges = [];
+    document.getElementById('tiltbanner').classList.add('on');
+    SFX.tilt();
+    setTimeout(() => document.getElementById('tiltbanner').classList.remove('on'), 6000);
+    popup(W / 2, 300, 'TILT', '#ff5b4a');
+  }
+}
+
+/* ================= rendering ================= */
+const cv = document.getElementById('pf');
+const cx = cv.getContext('2d');
+
+function draw(){
+  cx.clearRect(0, 0, W, H);
+
+  /* backboard grain */
+  cx.strokeStyle = 'rgba(120,90,50,.08)';
+  cx.lineWidth = 1;
+  for (let y = 40; y < H; y += 36){
+    cx.beginPath(); cx.moveTo(0, y); cx.lineTo(W, y); cx.stroke();
+  }
+
+  /* launcher rail + aim */
+  cx.fillStyle = 'rgba(90,58,34,.25)';
+  cx.fillRect(0, 84, W, 3);
+  const ax = Math.max(BALL_R + 4, Math.min(W - BALL_R - 4, aimX));
+  cx.fillStyle = '#b4342a';
+  cx.beginPath(); cx.arc(ax, 72, 7, 0, 7); cx.fill();
+  cx.strokeStyle = 'rgba(180,52,42,.4)';
+  cx.setLineDash([3, 6]);
+  cx.beginPath(); cx.moveTo(ax, 84); cx.lineTo(ax, 130); cx.stroke();
+  cx.setLineDash([]);
+
+  /* pegs: brass tacks */
+  for (const p of B.pegs){
+    cx.beginPath();
+    cx.arc(p.x, p.y, PEG_R + (p.flash > 0 ? 1.5 : 0), 0, 7);
+    cx.fillStyle = p.flash > 0 ? '#eed488' : '#c9a24a';
+    cx.fill();
+    cx.strokeStyle = '#8a6c2e'; cx.lineWidth = 1; cx.stroke();
+    cx.beginPath(); cx.arc(p.x - 1.4, p.y - 1.4, 1.4, 0, 7);
+    cx.fillStyle = 'rgba(255,245,210,.8)'; cx.fill();
+  }
+
+  /* bumpers: toadstools */
+  for (const p of B.bumpers){
+    const r = BUMP_R + (p.flash > 0 ? 3 : 0);
+    cx.beginPath(); cx.arc(p.x, p.y, r + 4, 0, 7);
+    cx.fillStyle = p.flash > 0 ? 'rgba(180,52,42,.35)' : 'rgba(180,52,42,.14)';
+    cx.fill();
+    cx.beginPath(); cx.arc(p.x, p.y, r, 0, 7);
+    cx.fillStyle = tilted() ? '#8a8378' : '#b4342a';
+    cx.fill();
+    cx.strokeStyle = '#7c2018'; cx.lineWidth = 2; cx.stroke();
+    cx.beginPath(); cx.arc(p.x, p.y, r * 0.45, 0, 7);
+    cx.fillStyle = '#f3e9d0'; cx.fill();
+    cx.font = '600 10px Optima,Candara,sans-serif';
+    cx.fillStyle = '#7c2018';
+    cx.textAlign = 'center'; cx.textBaseline = 'middle';
+    cx.fillText(String(bumperVal()), p.x, p.y + 0.5);
+  }
+
+  /* baskets */
+  for (let i = 0; i < SLOT_N; i++){
+    const x0 = i * SLOT_W;
+    cx.fillStyle = 'rgba(122,84,51,.16)';
+    cx.fillRect(x0 + 2, SLOT_TOP, SLOT_W - 4, H - SLOT_TOP - 4);
+    cx.strokeStyle = '#7a5433'; cx.lineWidth = 2;
+    cx.strokeRect(x0 + 2, SLOT_TOP, SLOT_W - 4, H - SLOT_TOP - 4);
+    /* weave lines */
+    cx.strokeStyle = 'rgba(122,84,51,.35)'; cx.lineWidth = 1;
+    for (let wy = SLOT_TOP + 10; wy < H - 10; wy += 10){
+      cx.beginPath(); cx.moveTo(x0 + 4, wy); cx.lineTo(x0 + SLOT_W - 4, wy); cx.stroke();
+    }
+    const m = B.slots[i];
+    cx.font = '600 15px Optima,Candara,sans-serif';
+    cx.fillStyle = m >= 10 ? '#b4342a' : m >= 5 ? '#8a6c2e' : '#5a3a22';
+    cx.textAlign = 'center'; cx.textBaseline = 'middle';
+    cx.fillText('×' + m, x0 + SLOT_W / 2, SLOT_TOP + 20);
+  }
+  /* dividers */
+  cx.fillStyle = '#5a3a22';
+  for (let i = 1; i < SLOT_N; i++) cx.fillRect(i * SLOT_W - 2, SLOT_TOP - 12, 4, H - SLOT_TOP + 8);
+
+  /* balls: apples (or golden pippins) */
+  for (const b of balls){
+    cx.beginPath(); cx.arc(b.x, b.y + 2, BALL_R, 0, 7);
+    cx.fillStyle = 'rgba(60,40,10,.18)'; cx.fill();     /* shadow */
+    cx.beginPath(); cx.arc(b.x, b.y, BALL_R, 0, 7);
+    cx.fillStyle = b.golden ? '#e0b64f' : '#b4342a';
+    cx.fill();
+    cx.strokeStyle = b.golden ? '#9b7a35' : '#7c2018';
+    cx.lineWidth = 1.5; cx.stroke();
+    cx.beginPath(); cx.arc(b.x - 2, b.y - 2.5, 2.2, 0, 7);
+    cx.fillStyle = 'rgba(255,240,220,.75)'; cx.fill();
+    cx.strokeStyle = '#4a6b3a'; cx.lineWidth = 1.6;
+    cx.beginPath(); cx.moveTo(b.x + 1, b.y - BALL_R + 1); cx.lineTo(b.x + 3.5, b.y - BALL_R - 3); cx.stroke();
+  }
+
+  /* score popups */
+  for (const q of popups){
+    cx.globalAlpha = Math.max(0, 1 - q.t);
+    cx.font = '700 ' + (q.text === 'TILT' ? 40 : 14) + 'px Optima,Candara,sans-serif';
+    cx.fillStyle = q.color;
+    cx.textAlign = 'center';
+    cx.fillText(q.text, q.x, q.y);
+    cx.globalAlpha = 1;
+  }
+}
+
+/* ================= persistence ================= */
+function save(){
+  try { localStorage.setItem('bc:save', JSON.stringify({ coins: S.coins, best: S.best, muted, up: S.up })); } catch (e){}
+}
+function load(){
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem('bc:save') || 'null'); } catch (e){}
+  S = d ? { coins: d.coins || 0, best: d.best || 0, up: Object.assign({}, DEFAULT_SAVE.up, d.up || {}) } : JSON.parse(JSON.stringify(DEFAULT_SAVE));
+  muted = d ? !!d.muted : false;
+}
+function boardBestKey(){ return 'bc:best:' + B.seed; }
+function bumpBest(payout){
+  try {
+    const prev = parseInt(localStorage.getItem(boardBestKey()) || '0', 10);
+    if (payout > prev) localStorage.setItem(boardBestKey(), String(payout));
+  } catch (e){}
+}
+
+/* ================= shop ================= */
+const SHOP = [
+  { k: 'hopper', nm: 'Bigger hopper', ds: () => 'Hold ' + (hopperCap() + 1) + ' apples', base: 150, x: 1.7 },
+  { k: 'regen', nm: 'Quicker orchard', ds: () => 'New apple every ' + (Math.max(900, 4000 * Math.pow(0.85, S.up.regen + 1)) / 1000).toFixed(1) + 's', base: 200, x: 1.7 },
+  { k: 'bumper', nm: 'Louder bumpers', ds: () => 'Bumpers worth ' + (25 + 12 * (S.up.bumper + 1)), base: 250, x: 1.7 },
+  { k: 'gold', nm: 'Golden pippins', ds: () => (4 * (S.up.gold + 1)) + '% chance of a ×5 apple', base: 400, x: 1.8, max: 10 },
+  { k: 'split', nm: 'Twin windfall', ds: () => (5 * (S.up.split + 1)) + '% split on bumper hit', base: 600, x: 1.9, max: 8 },
+  { k: 'nudge', nm: 'Loosen the bolts', ds: () => S.up.nudge ? 'Nudge is yours. Mind the TILT.' : 'Unlock NUDGE (N). Mind the TILT.', base: 500, x: 1, max: 1 }
+];
+function cost(it){ return Math.round(it.base * Math.pow(it.x, S.up[it.k])); }
+function renderShop(){
+  document.getElementById('shop-coins').textContent = S.coins + ' coins';
+  const box = document.getElementById('shop-items');
+  box.innerHTML = SHOP.map(it => {
+    const lv = S.up[it.k];
+    const maxed = it.max && lv >= it.max;
+    return '<div class="item"><div class="info">' +
+      '<div class="nm">' + it.nm + ' <span class="lvl">' + (maxed ? 'MAX' : 'lv ' + lv) + '</span></div>' +
+      '<div class="ds">' + it.ds() + '</div></div>' +
+      '<button data-buy="' + it.k + '" ' + (maxed || S.coins < cost(it) ? 'disabled' : '') + '>' +
+      (maxed ? '—' : cost(it) + ' ¢') + '</button></div>';
+  }).join('');
+  box.querySelectorAll('[data-buy]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const it = SHOP.find(i => i.k === btn.getAttribute('data-buy'));
+      if (!it || (it.max && S.up[it.k] >= it.max) || S.coins < cost(it)) return;
+      S.coins -= cost(it);
+      S.up[it.k]++;
+      SFX.buy();
+      save();
+      renderShop(); renderLCD(); renderHopper(); renderNudge();
+    });
+  });
+}
+function renderLCD(){
+  document.getElementById('lcd-coins').textContent = S.coins;
+  document.getElementById('lcd-best').textContent = S.best;
+}
+function renderHopper(){
+  const el = document.getElementById('hopper');
+  el.textContent = '●'.repeat(hopper) + '○'.repeat(Math.max(0, hopperCap() - hopper));
+}
+function renderNudge(){
+  document.getElementById('btn-nudge').style.display = S.up.nudge ? '' : 'none';
+}
+function toast(msg){
+  const n = document.createElement('div');
+  n.className = 'toast'; n.textContent = msg;
+  document.body.appendChild(n);
+  setTimeout(() => n.remove(), 2800);
+}
+
+/* ================= input ================= */
+function canvasX(e){
+  const r = cv.getBoundingClientRect();
+  const clientX = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
+  return (clientX - r.left) * (W / r.width);
+}
+cv.addEventListener('mousemove', e => { aimX = canvasX(e); });
+cv.addEventListener('mousedown', e => { aimX = canvasX(e); dropBall(); });
+cv.addEventListener('touchstart', e => { aimX = canvasX(e); dropBall(); e.preventDefault(); }, { passive: false });
+cv.addEventListener('touchmove', e => { aimX = canvasX(e); e.preventDefault(); }, { passive: false });
+document.addEventListener('keydown', e => {
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+  if (e.key === ' '){ dropBall(); e.preventDefault(); }
+  if (e.key === 'n' || e.key === 'N') nudge();
+  if (e.key === 'ArrowLeft') aimX = Math.max(BALL_R + 4, aimX - 22);
+  if (e.key === 'ArrowRight') aimX = Math.min(W - BALL_R - 4, aimX + 22);
+});
+document.getElementById('btn-nudge').addEventListener('click', nudge);
+document.getElementById('btn-new').addEventListener('click', () => { location.hash = randomSeed(); });
+document.getElementById('btn-daily').addEventListener('click', () => { location.hash = 'daily'; });
+document.getElementById('btn-mute').addEventListener('click', function(){
+  muted = !muted;
+  this.textContent = 'Sound: ' + (muted ? 'off' : 'on');
+  save();
+});
+const CANONICAL = 'https://davidwbritt.github.io/bumper-crop/';
+document.getElementById('btn-share').addEventListener('click', () => {
+  const url = CANONICAL + '#' + B.seed;
+  const ok = () => toast('Board link copied — same pegs for everyone');
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(ok, () => toast('Copy blocked — ' + url));
+  } else toast(url);
+});
+
+/* ================= loop & boot ================= */
+let lastT = 0;
+function loop(ts){
+  requestAnimationFrame(loop);
+  if (!lastT) lastT = ts;
+  let dt = Math.min(0.05, (ts - lastT) / 1000);
+  lastT = ts;
+  /* substeps keep fast balls out of the pegs' insides */
+  const n = Math.max(1, Math.ceil(dt / (1 / 240)));
+  for (let i = 0; i < n; i++) step(dt / n);
+  draw();
+}
+function boot(){
+  let seed = decodeURIComponent(location.hash.replace(/^#/, '')).trim();
+  if (seed === 'daily') seed = 'daily-' + new Date().toISOString().slice(0, 10);
+  if (!seed) seed = randomSeed();
+  history.replaceState(null, '', '#' + seed);
+  B = buildBoard(seed);
+  balls = [];
+  popups = [];
+  document.getElementById('f-seed').textContent = seed;
+  document.title = 'Bumper Crop — board ' + seed;
+  renderLCD(); renderHopper(); renderShop(); renderNudge();
+  document.getElementById('btn-mute').textContent = 'Sound: ' + (muted ? 'off' : 'on');
+}
+try { if (window.self !== window.top) document.documentElement.classList.add('embedded'); } catch (e){ document.documentElement.classList.add('embedded'); }
+load();
+hopper = hopperCap();
+regenAt = performance.now() + regenMs();
+window.addEventListener('hashchange', boot);
+boot();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
