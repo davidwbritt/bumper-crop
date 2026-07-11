@@ -166,7 +166,7 @@
 <div class="cab" id="cab">
   <div class="marquee">
     <h1>Bumper Crop</h1>
-    <span class="tag">Penny Arcade · Est. Whenever</span>
+    <span class="tag">Drop apples · steer the paddle · fill the big baskets</span>
     <span class="spacer"></span>
     <span class="lcd">Coins <b id="lcd-coins">0</b></span>
     <span class="lcd">Best drop <b id="lcd-best">0</b></span>
@@ -320,8 +320,12 @@ function buildBoard(seed){
 /* ================= game state (global, persists across boards) ================= */
 const DEFAULT_SAVE = {
   coins: 0, best: 0, muted: false,
-  up: { hopper: 0, regen: 0, bumper: 0, gold: 0, split: 0, nudge: 0 }
+  up: { hopper: 0, regen: 0, bumper: 0, gold: 0, split: 0, nudge: 0, paddle: 0 }
 };
+/* the paddle: rides above the baskets, follows the mouse */
+const PAD_Y = 566, PAD_H = 9;
+let padX = W / 2;
+function padW(){ return 66 + 13 * S.up.paddle; }
 let S = null;      /* save */
 let balls = [];
 let hopper = 3;
@@ -362,6 +366,9 @@ function step(dt){
   }
   /* tilt heat cools */
   tiltHeat = Math.max(0, tiltHeat - dt * 0.28);
+
+  /* the paddle chases the mouse */
+  padX += (Math.max(BALL_R + 4, Math.min(W - BALL_R - 4, aimX)) - padX) * Math.min(1, dt * 18);
 
   for (const b of balls){
     if (b.dead) continue;
@@ -419,6 +426,18 @@ function step(dt){
         }
       }
     }
+    /* the paddle: catches falling apples, adds english toward its edges.
+       gentle balls roll through — no infinite tennis */
+    if (b.vy > 150 && !tilted() &&
+        b.y + BALL_R > PAD_Y && b.y < PAD_Y + PAD_H + BALL_R &&
+        Math.abs(b.x - padX) < padW() / 2 + BALL_R * 0.6){
+      b.y = PAD_Y - BALL_R;
+      b.vy = -b.vy * 0.82;
+      b.vx += ((b.x - padX) / (padW() / 2)) * 230;
+      b.vx = Math.max(-620, Math.min(620, b.vx));
+      SFX.peg();
+    }
+
     /* basket dividers: simple vertical walls from SLOT_TOP down */
     if (b.y > SLOT_TOP - BALL_R){
       const k = Math.round(b.x / SLOT_W);
@@ -558,6 +577,20 @@ function draw(){
   cx.fillStyle = '#5a3a22';
   for (let i = 1; i < SLOT_N; i++) cx.fillRect(i * SLOT_W - 2, SLOT_TOP - 12, 4, H - SLOT_TOP + 8);
 
+  /* the paddle: a polished plank with brass caps */
+  const pw = padW();
+  cx.fillStyle = 'rgba(60,40,10,.2)';
+  cx.fillRect(padX - pw / 2 + 2, PAD_Y + 3, pw, PAD_H);
+  const grad = cx.createLinearGradient(0, PAD_Y, 0, PAD_Y + PAD_H);
+  grad.addColorStop(0, '#8a6236'); grad.addColorStop(0.5, '#6b4826'); grad.addColorStop(1, '#4a3018');
+  cx.fillStyle = grad;
+  cx.fillRect(padX - pw / 2, PAD_Y, pw, PAD_H);
+  cx.fillStyle = '#c9a24a';
+  cx.fillRect(padX - pw / 2 - 3, PAD_Y - 1, 6, PAD_H + 2);
+  cx.fillRect(padX + pw / 2 - 3, PAD_Y - 1, 6, PAD_H + 2);
+  cx.fillStyle = 'rgba(255,240,210,.35)';
+  cx.fillRect(padX - pw / 2, PAD_Y + 1, pw, 1.5);
+
   /* balls: apples (or golden pippins) */
   for (const b of balls){
     cx.beginPath(); cx.arc(b.x, b.y + 2, BALL_R, 0, 7);
@@ -609,6 +642,7 @@ const SHOP = [
   { k: 'bumper', nm: 'Louder bumpers', ds: () => 'Bumpers worth ' + (25 + 12 * (S.up.bumper + 1)), base: 250, x: 1.7 },
   { k: 'gold', nm: 'Golden pippins', ds: () => (4 * (S.up.gold + 1)) + '% chance of a ×5 apple', base: 400, x: 1.8, max: 10 },
   { k: 'split', nm: 'Twin windfall', ds: () => (5 * (S.up.split + 1)) + '% split on bumper hit', base: 600, x: 1.9, max: 8 },
+  { k: 'paddle', nm: 'Wider plank', ds: () => 'Paddle ' + (66 + 13 * (S.up.paddle + 1)) + ' wide — more saves, more english', base: 300, x: 1.7, max: 6 },
   { k: 'nudge', nm: 'Loosen the bolts', ds: () => S.up.nudge ? 'Nudge is yours. Mind the TILT.' : 'Unlock NUDGE (N). Mind the TILT.', base: 500, x: 1, max: 1 }
 ];
 function cost(it){ return Math.round(it.base * Math.pow(it.x, S.up[it.k])); }

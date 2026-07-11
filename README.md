@@ -10,10 +10,13 @@ offline, saves your coins and upgrades in the browser.
 ## The loop
 
 - Aim with the mouse (or ←/→), drop with click / tap / space
+- **The paddle follows your mouse** — after the drop, chase the apple and
+  bounce it toward the basket you want; hitting off-center adds english.
+  Gentle balls roll through, so juggling always ends in a basket
 - Pegs are worth a little, bumpers a lot; the basket multiplies the
   ball's whole haul (×1 to ×10)
 - Coins buy upgrades: bigger hopper, faster apples, louder bumpers,
-  golden pippins (×5 balls), twin windfall (splits), and — for the
+  golden pippins (×5 balls), twin windfall (splits), a wider plank, and — for the
   pinball faithful — **NUDGE**, which physically shoves every ball.
   Three nudges in quick succession and the machine **TILT**s: six
   seconds of dead bumpers and a locked hopper, exactly as tradition
