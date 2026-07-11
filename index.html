@@ -367,8 +367,8 @@ function step(dt){
   /* tilt heat cools */
   tiltHeat = Math.max(0, tiltHeat - dt * 0.28);
 
-  /* the paddle chases the mouse */
-  padX += (Math.max(BALL_R + 4, Math.min(W - BALL_R - 4, aimX)) - padX) * Math.min(1, dt * 18);
+  /* the paddle rides the mouse — near-instant, a whisper of weight */
+  padX += (Math.max(BALL_R + 4, Math.min(W - BALL_R - 4, aimX)) - padX) * Math.min(1, dt * 60);
 
   for (const b of balls){
     if (b.dead) continue;
@@ -702,8 +702,8 @@ document.addEventListener('keydown', e => {
   if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
   if (e.key === ' '){ dropBall(); e.preventDefault(); }
   if (e.key === 'n' || e.key === 'N') nudge();
-  if (e.key === 'ArrowLeft') aimX = Math.max(BALL_R + 4, aimX - 22);
-  if (e.key === 'ArrowRight') aimX = Math.min(W - BALL_R - 4, aimX + 22);
+  if (e.key === 'ArrowLeft') aimX = Math.max(BALL_R + 4, aimX - 36);
+  if (e.key === 'ArrowRight') aimX = Math.min(W - BALL_R - 4, aimX + 36);
 });
 document.getElementById('btn-nudge').addEventListener('click', nudge);
 document.getElementById('btn-new').addEventListener('click', () => { location.hash = randomSeed(); });
