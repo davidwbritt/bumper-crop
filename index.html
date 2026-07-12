@@ -91,6 +91,28 @@
   }
   #tiltbanner.on{display:flex;animation:tiltblink .5s steps(2) infinite}
   @keyframes tiltblink{50%{opacity:.55}}
+  #harvestover{
+    position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(30,22,10,.8);border-radius:8px;z-index:6;text-align:center;
+  }
+  #harvestover.on{display:flex}
+  #harvestover .hv-title{
+    font-family:var(--util);font-size:13px;letter-spacing:.4em;color:var(--brass);
+  }
+  #harvestover .hv-score{
+    font-family:var(--display);font-size:64px;color:var(--brass-lite);
+    text-shadow:0 0 26px rgba(238,212,136,.5);line-height:1.1;
+  }
+  #harvestover .hv-sub{
+    font-family:var(--util);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+    color:#9b7d45;margin-bottom:16px;
+  }
+  #harvestover button{
+    background:linear-gradient(180deg,var(--brass),#9b7a35);
+    border:none;border-radius:6px;color:#20160c;
+    font-family:var(--util);font-size:12px;letter-spacing:.16em;text-transform:uppercase;
+    padding:11px 22px;cursor:pointer;font-weight:600;
+  }
 
   .controls{
     display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap;
@@ -182,17 +204,27 @@
     <span class="spacer"></span>
     <span class="lcd">Coins <b id="lcd-coins">0</b></span>
     <span class="lcd">Best drop <b id="lcd-best">0</b></span>
+    <span class="lcd" id="lcd-runwrap" style="display:none">Run <b id="lcd-run">0</b></span>
   </div>
 
   <div>
     <div class="playfield">
       <canvas id="pf" width="480" height="680" aria-label="The orchard machine"></canvas>
       <div id="tiltbanner">TILT</div>
+      <div id="harvestover" role="dialog">
+        <div>
+          <div class="hv-title">HARVEST IN</div>
+          <div class="hv-score" id="hv-score">0</div>
+          <div class="hv-sub" id="hv-sub"></div>
+          <button id="hv-again">New harvest</button>
+        </div>
+      </div>
     </div>
     <div class="controls">
       <span class="hopper" id="hopper" title="Apples in the hopper">●●●</span>
       <span style="font-size:9px;letter-spacing:.14em;color:#9b7d45">CLICK / ↓ · DROP&nbsp;&nbsp;SPACE / ↑ · HOP&nbsp;&nbsp;← → · AIM</span>
       <button id="btn-nudge" style="display:none" title="Shove the cabinet (N). Three in quick order and she TILTs.">Nudge (N)</button>
+      <button id="btn-mode" title="Harvest: buckets fill and close; when all are full, the run ends and is scored">Mode: Free play</button>
       <span class="spacer"></span>
       <button id="btn-daily" title="Same board for everyone, new at midnight UTC">Daily board</button>
       <button id="btn-new" title="A fresh peg layout">New board</button>
@@ -356,6 +388,8 @@ function buildBoard(seed){
   /* drop targets: a bank of three on a seeded side */
   const bankX = chance(rng, 0.5) ? rint(rng, 60, 150) : rint(rng, 260, 350);
   board.prism = null;
+  board.fill = new Array(SLOT_N).fill(0);
+  board.harvest = { total: 0, apples: 0, over: false };
   board.bank = { resetAt: 0, targets: [0, 1, 2].map(i => ({ x: bankX + i * 26, y: 508, w: 16, h: 22, up: true })) };
   board.pegs = board.pegs.filter(p => !(Math.abs(p.y - 512) < 40 && p.x > bankX - 26 && p.x < bankX + 96));
   return board;
@@ -365,7 +399,7 @@ function buildBoard(seed){
 const DEFAULT_SAVE = {
   coins: 0, best: 0, muted: false,
   up: { hopper: 0, regen: 0, bumper: 0, gold: 0, split: 0, nudge: 0, paddle: 0 },
-  tw: { pad: 60, theme: 'orchard', bumper: 'round', bounce: 72 }
+  tw: { pad: 60, theme: 'orchard', bumper: 'round', bounce: 72, mode: 'free' }
 };
 /* the paddle: rides above the baskets, follows the mouse */
 const PAD_Y = 566, PAD_H = 9, PAD_JUMP_T = 0.32, PAD_JUMP_H = 18;
@@ -403,10 +437,33 @@ function bumperVal(){ return 25 + 12 * S.up.bumper; }
 function goldChance(){ return 0.04 * S.up.gold; }
 function splitChance(){ return 0.05 * S.up.split; }
 function tilted(){ return performance.now() < tiltedUntil; }
+const BUCKET_CAP = 8;
+function harvestMode(){ return S.tw && S.tw.mode === 'harvest'; }
+function resetHarvest(){
+  B.fill = new Array(SLOT_N).fill(0);
+  B.harvest = { total: 0, apples: 0, over: false };
+  document.getElementById('harvestover').classList.remove('on');
+  renderLCD();
+}
+function endHarvest(){
+  B.harvest.over = true;
+  const key = 'bc:harvest:' + B.seed;
+  let best = 0;
+  try { best = parseInt(localStorage.getItem(key) || '0', 10); } catch (e){}
+  const isBest = B.harvest.total > best;
+  if (isBest){ try { localStorage.setItem(key, String(B.harvest.total)); } catch (e){} }
+  document.getElementById('hv-score').textContent = B.harvest.total;
+  document.getElementById('hv-sub').textContent =
+    B.harvest.apples + ' apples on this board · ' + (isBest ? 'NEW BEST' : 'best ' + Math.max(best, B.harvest.total));
+  document.getElementById('harvestover').classList.add('on');
+  SFX.basket(10);
+  setTimeout(() => SFX.basket(10), 220);
+}
 
 /* ================= physics ================= */
 function dropBall(){
   if (tilted() || hopper <= 0 || balls.length > 14) return;
+  if (harvestMode() && B.harvest.over) return;
   hopper--;
   const golden = R() < goldChance();
   balls.push({
@@ -714,6 +771,12 @@ function step(dt){
         continue;
       }
       b.dead = true;
+      /* harvest mode: a full bucket takes no more apples */
+      if (harvestMode() && B.fill[slot] >= BUCKET_CAP){
+        popup(b.x, H - 40, 'full.', 'ink');
+        tone(160, 0.1, 'sine', 0.05, 0.7);
+        continue;
+      }
       let payout = Math.max(1, b.score) * mult;
       if (b.golden) payout *= 5;
       S.coins += payout;
@@ -721,6 +784,12 @@ function step(dt){
       bumpBest(payout);
       popup(b.x, H - 40, '+' + payout + (b.golden ? ' ✦' : ''), b.golden ? 'gold' : 'ink');
       SFX.basket(mult);
+      if (harvestMode()){
+        B.fill[slot]++;
+        B.harvest.total += payout;
+        B.harvest.apples++;
+        if (B.fill.every(f => f >= BUCKET_CAP) && !B.harvest.over) endHarvest();
+      }
       save();
       renderLCD();
       renderShop();
@@ -921,10 +990,26 @@ function draw(){
       cx.beginPath(); cx.moveTo(x0 + 4, wy); cx.lineTo(x0 + SLOT_W - 4, wy); cx.stroke();
     }
     const m = B.slots[i];
+    const full = harvestMode() && B.fill[i] >= BUCKET_CAP;
     cx.font = '600 15px Optima,Candara,sans-serif';
-    cx.fillStyle = m >= 10 ? T.slotHi : m >= 5 ? T.slotMid : T.slotLo;
+    cx.fillStyle = full ? T.slotLo : m >= 10 ? T.slotHi : m >= 5 ? T.slotMid : T.slotLo;
     cx.textAlign = 'center'; cx.textBaseline = 'middle';
-    cx.fillText('×' + m, x0 + SLOT_W / 2, SLOT_TOP + 20);
+    cx.fillText(full ? 'FULL' : '×' + m, x0 + SLOT_W / 2, SLOT_TOP + 20);
+    if (harvestMode()){
+      /* the harvest so far, stacked in the basket */
+      const n = Math.min(BUCKET_CAP, B.fill[i]);
+      for (let a = 0; a < n; a++){
+        const ax2 = x0 + SLOT_W / 2 + [-17, 0, 17][a % 3] + (Math.floor(a / 3) % 2 ? 8 : 0);
+        const ay2 = H - 13 - Math.floor(a / 3) * 11;
+        cx.beginPath(); cx.arc(ax2, ay2, 5.5, 0, 7);
+        cx.fillStyle = T.ball; cx.fill();
+        cx.strokeStyle = T.ballRim; cx.lineWidth = 1; cx.stroke();
+      }
+      if (full){
+        cx.fillStyle = T.divider;
+        cx.fillRect(x0 + 3, SLOT_TOP - 4, SLOT_W - 6, 6);
+      }
+    }
   }
   cx.fillStyle = T.divider;
   for (let i = 1; i < SLOT_N; i++) cx.fillRect(i * SLOT_W - 2, SLOT_TOP - 12, 4, H - SLOT_TOP + 8);
@@ -1060,6 +1145,9 @@ function renderShop(){
 function renderLCD(){
   document.getElementById('lcd-coins').textContent = S.coins;
   document.getElementById('lcd-best').textContent = S.best;
+  const hv = harvestMode();
+  document.getElementById('lcd-runwrap').style.display = hv ? '' : 'none';
+  if (hv && B) document.getElementById('lcd-run').textContent = B.harvest.total;
 }
 function renderHopper(){
   const el = document.getElementById('hopper');
@@ -1151,6 +1239,17 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowRight') aimX = Math.min(W - BALL_R - 4, aimX + 36);
 });
 document.getElementById('btn-nudge').addEventListener('click', nudge);
+function renderMode(){
+  document.getElementById('btn-mode').textContent = 'Mode: ' + (harvestMode() ? 'Harvest' : 'Free play');
+}
+document.getElementById('btn-mode').addEventListener('click', () => {
+  S.tw.mode = harvestMode() ? 'free' : 'harvest';
+  save();
+  renderMode();
+  resetHarvest();
+  toast(harvestMode() ? 'Harvest: fill every bucket — 8 apples each — then the count' : 'Free play: the orchard never closes');
+});
+document.getElementById('hv-again').addEventListener('click', resetHarvest);
 document.getElementById('btn-new').addEventListener('click', () => { location.hash = randomSeed(); });
 document.getElementById('btn-daily').addEventListener('click', () => { location.hash = 'daily'; });
 document.getElementById('btn-mute').addEventListener('click', function(){
@@ -1189,7 +1288,8 @@ function boot(){
   popups = [];
   document.getElementById('f-seed').textContent = seed;
   document.title = 'Bumper Crop — board ' + seed;
-  renderLCD(); renderHopper(); renderShop(); renderNudge();
+  renderLCD(); renderHopper(); renderShop(); renderNudge(); renderMode();
+  document.getElementById('harvestover').classList.remove('on');
   document.getElementById('btn-mute').textContent = 'Sound: ' + (muted ? 'off' : 'on');
 }
 try { if (window.self !== window.top) document.documentElement.classList.add('embedded'); } catch (e){ document.documentElement.classList.add('embedded'); }

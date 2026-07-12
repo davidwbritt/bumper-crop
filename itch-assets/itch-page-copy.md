@@ -52,6 +52,10 @@ a proper volley when a catch is worth fighting for.
 **Spend your coins at the Back Counter:** bigger hopper, faster apples,
 louder bumpers, golden pippins (×5), twin windfalls, a wider plank.
 
+**Harvest mode** turns it finite: buckets hold 8 apples each, full ones
+close, and when all seven are full your run is scored — 56 landings,
+make each one count. Per-board bests are kept.
+
 **Every board is an address.** The URL hash is the peg layout —
 `#orchard-fair-42` is the same board for everyone, forever. **Daily
 board** gives the whole world one shared layout per day; find the lane
