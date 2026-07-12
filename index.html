@@ -389,7 +389,7 @@ function buildBoard(seed){
   const bankX = chance(rng, 0.5) ? rint(rng, 60, 150) : rint(rng, 260, 350);
   board.prism = null;
   board.fill = new Array(SLOT_N).fill(0);
-  board.harvest = { total: 0, apples: 0, over: false };
+  board.harvest = { total: 0, apples: 0, waste: 0, over: false };
   board.bank = { resetAt: 0, targets: [0, 1, 2].map(i => ({ x: bankX + i * 26, y: 508, w: 16, h: 22, up: true })) };
   board.pegs = board.pegs.filter(p => !(Math.abs(p.y - 512) < 40 && p.x > bankX - 26 && p.x < bankX + 96));
   return board;
@@ -441,7 +441,7 @@ const BUCKET_CAP = 9;
 function harvestMode(){ return S.tw && S.tw.mode === 'harvest'; }
 function resetHarvest(){
   B.fill = new Array(SLOT_N).fill(0);
-  B.harvest = { total: 0, apples: 0, over: false };
+  B.harvest = { total: 0, apples: 0, waste: 0, over: false };
   document.getElementById('harvestover').classList.remove('on');
   renderLCD();
 }
@@ -453,8 +453,11 @@ function endHarvest(){
   const isBest = B.harvest.total > best;
   if (isBest){ try { localStorage.setItem(key, String(B.harvest.total)); } catch (e){} }
   document.getElementById('hv-score').textContent = B.harvest.total;
+  const perfect = B.harvest.waste === 0;
+  document.querySelector('#harvestover .hv-title').textContent = perfect ? 'PERFECT HARVEST' : 'HARVEST IN';
   document.getElementById('hv-sub').textContent =
-    B.harvest.apples + ' apples on this board · ' + (isBest ? 'NEW BEST' : 'best ' + Math.max(best, B.harvest.total));
+    (perfect ? 'not one apple wasted' : B.harvest.waste + ' wasted along the way') +
+    ' · ' + (isBest ? 'NEW BEST' : 'best ' + Math.max(best, B.harvest.total));
   document.getElementById('harvestover').classList.add('on');
   SFX.basket(10);
   setTimeout(() => SFX.basket(10), 220);
@@ -552,7 +555,10 @@ function step(dt){
       c.x += c.vx * dt; c.y += c.vy * dt;
       if (c.target){ c.target.x = c.x; c.target.y = c.y + 13; }
       if (c.y < -40 || c.x < -60 || c.x > W + 60){
-        if (c.target){ c.target.dead = true; c.target.carried = false; }
+        if (c.target){
+          c.target.dead = true; c.target.carried = false;
+          if (harvestMode() && !B.harvest.over) B.harvest.waste++;
+        }
         popup(Math.max(30, Math.min(W - 30, c.x)), 40, 'stolen.', 'ink');
         c.state = 'gone';
       }
@@ -773,6 +779,7 @@ function step(dt){
       b.dead = true;
       /* harvest mode: a full bucket takes no more apples */
       if (harvestMode() && B.fill[slot] >= BUCKET_CAP){
+        B.harvest.waste++;
         popup(b.x, H - 40, 'full.', 'ink');
         tone(160, 0.1, 'sine', 0.05, 0.7);
         continue;
