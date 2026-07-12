@@ -42,7 +42,10 @@ multiply an apple's whole haul, ×1 to ×10.
 - **Rollover lanes** that spell **C·R·O·P** — complete the word to arm
   the **kickback**, which fires balls back out of the lousy ×1 baskets
 - A **drop-target bank**: flatten all three for a coin burst
-- **NUDGE** — physically shove the machine. Three too fast and she
+- **The crow.** Now and then a crow swoops in and steals an apple in
+  play — golden ones included. A well-timed **NUDGE** startles it into
+  dropping your apple back onto the board. Yes, really.
+- **NUDGE** — physically shove the machine (also: bird defense). Three too fast and she
   **TILTs**: locked hopper, dead bumpers, blinking red letters, exactly
   as tradition demands
 
