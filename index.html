@@ -191,7 +191,7 @@
     </div>
     <div class="controls">
       <span class="hopper" id="hopper" title="Apples in the hopper">●●●</span>
-      <span style="font-size:9px;letter-spacing:.14em;color:#9b7d45">CLICK · DROP&nbsp;&nbsp;SPACE · HOP</span>
+      <span style="font-size:9px;letter-spacing:.14em;color:#9b7d45">CLICK / ↓ · DROP&nbsp;&nbsp;SPACE · HOP&nbsp;&nbsp;← → · AIM</span>
       <button id="btn-nudge" style="display:none" title="Shove the cabinet (N). Three in quick order and she TILTs.">Nudge (N)</button>
       <span class="spacer"></span>
       <button id="btn-daily" title="Same board for everyone, new at midnight UTC">Daily board</button>
@@ -1145,7 +1145,7 @@ cv.addEventListener('touchmove', e => { aimX = canvasX(e); e.preventDefault(); }
 document.addEventListener('keydown', e => {
   if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
   if (e.key === ' '){ padJump(); e.preventDefault(); }
-  if (e.key === 'ArrowUp' || e.key === 'Enter'){ dropBall(); e.preventDefault(); }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter'){ dropBall(); e.preventDefault(); }
   if (e.key === 'n' || e.key === 'N') nudge();
   if (e.key === 'ArrowLeft') aimX = Math.max(BALL_R + 4, aimX - 36);
   if (e.key === 'ArrowRight') aimX = Math.min(W - BALL_R - 4, aimX + 36);

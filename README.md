@@ -9,7 +9,7 @@ offline, saves your coins and upgrades in the browser.
 
 ## The loop
 
-- Aim with the mouse (or ←/→); drop with click / tap / Enter / ↑
+- Aim with the mouse (or ←/→); drop with click / tap / ↓ / Enter — fully keyboard-playable: ← → aim, ↓ drop, space hop, N nudge
 - **The paddle follows your mouse** — chase the apple and bounce it toward
   the basket you want; off-center hits add english. Gentle balls roll
   through… unless you **HOP** (space / right-click): the rising plank
