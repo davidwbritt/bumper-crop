@@ -22,6 +22,13 @@ offline, saves your coins and upgrades in the browser.
   seconds of dead bumpers and a locked hopper, exactly as tradition
   demands.
 
+## The Tinker's Hatch
+
+Below the shop: free tweaks, saved with your game. **Paddle feel** slider
+(heavy → lightning), four **paint schemes** (Orchard, Midnight, Circus,
+Copper), and **square bumpers** — with true square physics, so flat sides
+kick straight and corners are spicy. Not a reskin; a variant.
+
 ## Boards are seeded
 
 The URL hash is the peg layout: `#orchard-fair-42` is the same board for
