@@ -33,7 +33,8 @@ tell Claude to point `CANONICAL` at the itch URL instead.
 
 Bumper Crop is a penny-arcade orchard machine: aim your drop, then steer
 the paddle to bounce each apple toward the basket you want — the baskets
-multiply an apple's whole haul, ×1 to ×10.
+multiply an apple's whole haul, ×1 to ×10. **Space hops the paddle** for
+a proper volley when a catch is worth fighting for.
 
 **Real pinball furniture, miniaturized:**
 
@@ -41,7 +42,9 @@ multiply an apple's whole haul, ×1 to ×10.
   honest square physics, from the Tinker's Hatch)
 - **Rollover lanes** that spell **C·R·O·P** — complete the word to arm
   the **kickback**, which fires balls back out of the lousy ×1 baskets
-- A **drop-target bank**: flatten all three for a coin burst
+- A **drop-target bank**: flatten all three for a coin burst — and a
+  **prism peg** appears, a rainbow pin that births a new ball each time
+  it's struck. Multiball is earned, not given
 - **NUDGE** — physically shove the machine. Three too fast and she
   **TILTs**: locked hopper, dead bumpers, blinking red letters, exactly
   as tradition demands

@@ -191,6 +191,7 @@
     </div>
     <div class="controls">
       <span class="hopper" id="hopper" title="Apples in the hopper">●●●</span>
+      <span style="font-size:9px;letter-spacing:.14em;color:#9b7d45">CLICK · DROP&nbsp;&nbsp;SPACE · HOP</span>
       <button id="btn-nudge" style="display:none" title="Shove the cabinet (N). Three in quick order and she TILTs.">Nudge (N)</button>
       <span class="spacer"></span>
       <button id="btn-daily" title="Same board for everyone, new at midnight UTC">Daily board</button>
@@ -354,6 +355,7 @@ function buildBoard(seed){
   board.kickArmed = false;
   /* drop targets: a bank of three on a seeded side */
   const bankX = chance(rng, 0.5) ? rint(rng, 60, 150) : rint(rng, 260, 350);
+  board.prism = null;
   board.bank = { resetAt: 0, targets: [0, 1, 2].map(i => ({ x: bankX + i * 26, y: 508, w: 16, h: 22, up: true })) };
   board.pegs = board.pegs.filter(p => !(Math.abs(p.y - 512) < 40 && p.x > bankX - 26 && p.x < bankX + 96));
   return board;
@@ -366,9 +368,25 @@ const DEFAULT_SAVE = {
   tw: { pad: 60, theme: 'orchard', bumper: 'round', bounce: 72 }
 };
 /* the paddle: rides above the baskets, follows the mouse */
-const PAD_Y = 566, PAD_H = 9;
+const PAD_Y = 566, PAD_H = 9, PAD_JUMP_T = 0.32, PAD_JUMP_H = 18;
 let padX = W / 2;
+let padJumpT = 0;   /* time left in the current hop */
+let padPulse = 0;   /* squash on impact */
+let padFx = [];     /* impact rings */
+function padThock(vy){
+  tone(150 + Math.min(500, vy) * 0.14, 0.09, 'square', Math.min(0.11, 0.045 + vy / 9000), 1.5);
+}
 function padW(){ return 66 + 13 * S.up.paddle; }
+function padYEff(){
+  if (padJumpT <= 0) return PAD_Y;
+  return PAD_Y - PAD_JUMP_H * Math.sin(Math.PI * (1 - padJumpT / PAD_JUMP_T));
+}
+function padRising(){ return padJumpT > PAD_JUMP_T / 2; }
+function padJump(){
+  if (padJumpT > 0 || tilted()) return;
+  padJumpT = PAD_JUMP_T;
+  tone(240, 0.07, 'square', 0.06, 1.5);
+}
 let S = null;      /* save */
 let balls = [];
 let hopper = 3;
@@ -423,11 +441,23 @@ function step(dt){
 
   /* the paddle rides the mouse — feel set at the Tinker's Hatch */
   padX += (Math.max(BALL_R + 4, Math.min(W - BALL_R - 4, aimX)) - padX) * Math.min(1, dt * (S.tw ? S.tw.pad : 60));
+  if (padJumpT > 0) padJumpT = Math.max(0, padJumpT - dt);
+  padPulse = Math.max(0, padPulse - dt);
+  for (const f of padFx) f.t += dt;
+  padFx = padFx.filter(f => f.t < 0.28);
 
   /* drop targets stand back up after a spell */
   if (B.bank.resetAt && now >= B.bank.resetAt){
     B.bank.resetAt = 0;
     B.bank.targets.forEach(t => { t.up = true; });
+  }
+  /* the prism fades when spent or stale */
+  if (B.prism){
+    B.prism.flash = Math.max(0, B.prism.flash - dt);
+    if (B.prism.charges <= 0 || now >= B.prism.until){
+      popup(B.prism.x, B.prism.y, 'the prism fades', 'ink');
+      B.prism = null;
+    }
   }
   for (const r of B.rolls) r.flash = Math.max(0, r.flash - dt);
 
@@ -527,7 +557,40 @@ function step(dt){
           popup(t.x, t.y - 40, 'BANK! +' + prize, 'gold');
           SFX.basket(5);
           B.bank.resetAt = now + 12000;
+          /* the prize behind the prize: a prism peg appears */
+          let px = 0, py2 = 0, tries = 0;
+          do {
+            px = 70 + R() * (W - 140);
+            py2 = 260 + R() * 160;
+            tries++;
+          } while (tries < 24 && B.bumpers.some(q => (q.x - px) ** 2 + (q.y - py2) ** 2 < 60 * 60));
+          B.prism = { x: px, y: py2, charges: 3, until: now + 20000, flash: 0 };
+          popup(px, py2 - 24, 'A PRISM PEG!', 'gold');
+          SFX.gold();
           save(); renderLCD(); renderShop();
+        }
+      }
+    }
+
+    /* the prism peg: bounce, and every strike births a ball */
+    if (B.prism){
+      const pr = B.prism;
+      const dx = b.x - pr.x, dy = b.y - pr.y;
+      const d2 = dx * dx + dy * dy, rr = BALL_R + 9;
+      if (d2 < rr * rr && d2 > 0.0001){
+        const d = Math.sqrt(d2), nx = dx / d, ny = dy / d;
+        b.x = pr.x + nx * rr; b.y = pr.y + ny * rr;
+        const dot = b.vx * nx + b.vy * ny;
+        if (dot < 0){
+          b.vx -= 1.8 * dot * nx;
+          b.vy -= 1.8 * dot * ny;
+          if (pr.flash <= 0 && balls.length < 14){
+            pr.charges--;
+            pr.flash = 0.3;
+            balls.push({ x: pr.x + (R() - 0.5) * 8, y: pr.y - 16, vx: (R() - 0.5) * 240, vy: -340, score: 0, golden: false, dead: false });
+            popup(pr.x, pr.y - 26, 'SPAWN!', 'split');
+            SFX.gold();
+          }
         }
       }
     }
@@ -597,15 +660,34 @@ function step(dt){
     }
     /* end bumpers */
     /* the paddle: catches falling apples, adds english toward its edges.
-       gentle balls roll through — no infinite tennis */
-    if (b.vy > 150 && !tilted() &&
-        b.y + BALL_R > PAD_Y && b.y < PAD_Y + PAD_H + BALL_R &&
-        Math.abs(b.x - padX) < padW() / 2 + BALL_R * 0.6){
-      b.y = PAD_Y - BALL_R;
-      b.vy = -b.vy * 0.82;
-      b.vx += ((b.x - padX) / (padW() / 2)) * 230;
-      b.vx = Math.max(-620, Math.min(620, b.vx));
-      SFX.peg();
+       gentle balls roll through — unless the paddle HOPS (space / right-click),
+       which volleys anything it touches, rescue included */
+    {
+      const py = padYEff();
+      const inBand = b.y + BALL_R > py && b.y < py + PAD_H + BALL_R &&
+        Math.abs(b.x - padX) < padW() / 2 + BALL_R * 0.6;
+      if (inBand && !tilted()){
+        if (padRising() && b.vy > -60){
+          /* struck by the rising plank: real energy in */
+          b.y = py - BALL_R - 1;
+          const inVy = Math.abs(b.vy);
+          b.vy = -(430 + inVy * 0.55);
+          b.vx += ((b.x - padX) / (padW() / 2)) * 260;
+          b.vx = Math.max(-620, Math.min(620, b.vx));
+          padPulse = 0.14;
+          padFx.push({ x: b.x, y: py, t: 0, big: true });
+          SFX.bumper();
+        } else if (b.vy > 150){
+          const inVy = b.vy;
+          b.y = py - BALL_R;
+          b.vy = -b.vy * 0.87;
+          b.vx += ((b.x - padX) / (padW() / 2)) * 230;
+          b.vx = Math.max(-620, Math.min(620, b.vx));
+          padPulse = Math.min(0.14, 0.05 + inVy / 8000);
+          padFx.push({ x: b.x, y: py, t: 0, big: false });
+          padThock(inVy);
+        }
+      }
     }
 
     /* basket dividers: simple vertical walls from SLOT_TOP down */
@@ -809,6 +891,24 @@ function draw(){
     cx.fillText(String(bumperVal()), p.x, p.y + 0.5);
   }
 
+  /* the prism peg, while it lasts */
+  if (B.prism){
+    const pr = B.prism;
+    const hue = (performance.now() / 4) % 360;
+    const r = 9 + (pr.flash > 0 ? 3 : 0);
+    cx.beginPath(); cx.arc(pr.x, pr.y, r + 5, 0, 7);
+    cx.fillStyle = 'hsla(' + hue + ',85%,60%,.25)'; cx.fill();
+    cx.beginPath(); cx.arc(pr.x, pr.y, r, 0, 7);
+    cx.fillStyle = 'hsl(' + hue + ',85%,60%)'; cx.fill();
+    cx.strokeStyle = 'hsl(' + ((hue + 180) % 360) + ',85%,45%)'; cx.lineWidth = 2; cx.stroke();
+    cx.beginPath(); cx.arc(pr.x - 2.5, pr.y - 2.5, 2.2, 0, 7);
+    cx.fillStyle = 'rgba(255,255,255,.85)'; cx.fill();
+    cx.font = '700 9px Optima,Candara,sans-serif';
+    cx.fillStyle = 'rgba(255,255,255,.9)';
+    cx.textAlign = 'center';
+    cx.fillText('✦'.repeat(Math.max(0, pr.charges)), pr.x, pr.y + 22);
+  }
+
   /* baskets */
   for (let i = 0; i < SLOT_N; i++){
     const x0 = i * SLOT_W;
@@ -829,19 +929,30 @@ function draw(){
   cx.fillStyle = T.divider;
   for (let i = 1; i < SLOT_N; i++) cx.fillRect(i * SLOT_W - 2, SLOT_TOP - 12, 4, H - SLOT_TOP + 8);
 
-  /* the paddle */
-  const pw = padW();
+  /* the paddle: hops, squashes, rings */
+  const pw = padW() * (padPulse > 0 ? 1.05 : 1);
+  const py0 = padYEff() + (padPulse > 0 ? 2 : 0);
+  const ph = PAD_H * (padPulse > 0 ? 0.8 : 1);
   cx.fillStyle = T.shadow;
   cx.fillRect(padX - pw / 2 + 2, PAD_Y + 3, pw, PAD_H);
-  const grad = cx.createLinearGradient(0, PAD_Y, 0, PAD_Y + PAD_H);
+  const grad = cx.createLinearGradient(0, py0, 0, py0 + ph);
   grad.addColorStop(0, T.padA); grad.addColorStop(0.5, T.padB); grad.addColorStop(1, T.padC);
   cx.fillStyle = grad;
-  cx.fillRect(padX - pw / 2, PAD_Y, pw, PAD_H);
+  cx.fillRect(padX - pw / 2, py0, pw, ph);
   cx.fillStyle = T.padCap;
-  cx.fillRect(padX - pw / 2 - 3, PAD_Y - 1, 6, PAD_H + 2);
-  cx.fillRect(padX + pw / 2 - 3, PAD_Y - 1, 6, PAD_H + 2);
-  cx.fillStyle = 'rgba(255,255,255,.25)';
-  cx.fillRect(padX - pw / 2, PAD_Y + 1, pw, 1.5);
+  cx.fillRect(padX - pw / 2 - 3, py0 - 1, 6, ph + 2);
+  cx.fillRect(padX + pw / 2 - 3, py0 - 1, 6, ph + 2);
+  cx.fillStyle = padPulse > 0 ? 'rgba(255,255,255,.5)' : 'rgba(255,255,255,.25)';
+  cx.fillRect(padX - pw / 2, py0 + 1, pw, 1.5);
+  for (const f of padFx){
+    const a = Math.max(0, 1 - f.t / 0.28);
+    cx.globalAlpha = a * 0.8;
+    cx.strokeStyle = T.padCap; cx.lineWidth = 2;
+    cx.beginPath();
+    cx.arc(f.x, f.y, (f.big ? 10 : 6) + f.t * (f.big ? 110 : 70), 0, 7);
+    cx.stroke();
+    cx.globalAlpha = 1;
+  }
 
   /* balls */
   for (const b of balls){
@@ -1028,11 +1139,13 @@ function canvasX(e){
 }
 cv.addEventListener('mousemove', e => { aimX = canvasX(e); });
 cv.addEventListener('mousedown', e => { aimX = canvasX(e); dropBall(); });
+cv.addEventListener('contextmenu', e => { e.preventDefault(); padJump(); });
 cv.addEventListener('touchstart', e => { aimX = canvasX(e); dropBall(); e.preventDefault(); }, { passive: false });
 cv.addEventListener('touchmove', e => { aimX = canvasX(e); e.preventDefault(); }, { passive: false });
 document.addEventListener('keydown', e => {
   if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
-  if (e.key === ' '){ dropBall(); e.preventDefault(); }
+  if (e.key === ' '){ padJump(); e.preventDefault(); }
+  if (e.key === 'ArrowUp' || e.key === 'Enter'){ dropBall(); e.preventDefault(); }
   if (e.key === 'n' || e.key === 'N') nudge();
   if (e.key === 'ArrowLeft') aimX = Math.max(BALL_R + 4, aimX - 36);
   if (e.key === 'ArrowRight') aimX = Math.min(W - BALL_R - 4, aimX + 36);

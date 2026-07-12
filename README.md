@@ -9,10 +9,11 @@ offline, saves your coins and upgrades in the browser.
 
 ## The loop
 
-- Aim with the mouse (or ←/→), drop with click / tap / space
-- **The paddle follows your mouse** — after the drop, chase the apple and
-  bounce it toward the basket you want; hitting off-center adds english.
-  Gentle balls roll through, so juggling always ends in a basket
+- Aim with the mouse (or ←/→); drop with click / tap / Enter / ↑
+- **The paddle follows your mouse** — chase the apple and bounce it toward
+  the basket you want; off-center hits add english. Gentle balls roll
+  through… unless you **HOP** (space / right-click): the rising plank
+  volleys anything it touches, rescue included
 - Pegs are worth a little, bumpers a lot; the basket multiplies the
   ball's whole haul (×1 to ×10)
 - Coins buy upgrades: bigger hopper, faster apples, louder bumpers,
@@ -29,8 +30,9 @@ offline, saves your coins and upgrades in the browser.
   complete the word and the **kickback** arms
 - **Kickback** — while armed, a ball landing in a lousy ×1 basket gets
   fired back into play, score intact, one save per arming
-- **Drop targets** — knock the bank of three down for a coin burst;
-  they stand back up after a spell
+- **Drop targets** — knock the bank of three down for a coin burst —
+  and a **prism peg** appears: a rainbow pin that spawns a fresh ball
+  every time it's struck (three charges, twenty seconds, total mayhem)
 - The orchard is said to have wildlife. No further comment.
 
 ## The Tinker's Hatch
