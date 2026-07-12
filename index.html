@@ -731,10 +731,12 @@ function step(dt){
         Math.abs(b.x - padX) < padW() / 2 + BALL_R * 0.6;
       if (inBand && !tilted()){
         if (padRising() && b.vy > -60){
-          /* struck by the rising plank: real energy in */
+          /* struck by the rising plank: a centered hit volleys with kickback force,
+             fading toward the edges where the english takes over */
           b.y = py - BALL_R - 1;
           const inVy = Math.abs(b.vy);
-          b.vy = -(430 + inVy * 0.55);
+          const off = Math.min(1, Math.abs(b.x - padX) / (padW() / 2));
+          b.vy = -Math.min(880, (760 + inVy * 0.35) * (1 - 0.4 * off));
           b.vx += ((b.x - padX) / (padW() / 2)) * 260;
           b.vx = Math.max(-620, Math.min(620, b.vx));
           padPulse = 0.14;
@@ -1235,8 +1237,45 @@ function canvasX(e){
 cv.addEventListener('mousemove', e => { aimX = canvasX(e); });
 cv.addEventListener('mousedown', e => { aimX = canvasX(e); dropBall(); });
 cv.addEventListener('contextmenu', e => { e.preventDefault(); padJump(); });
-cv.addEventListener('touchstart', e => { aimX = canvasX(e); dropBall(); e.preventDefault(); }, { passive: false });
-cv.addEventListener('touchmove', e => { aimX = canvasX(e); e.preventDefault(); }, { passive: false });
+/* touch: hold + drag steers · a quick tap drops an apple AND bumps the paddle ·
+   a quick upward flick shoves the table (nudge — TILT rules apply) */
+function tapAction(){ dropBall(); padJump(); }
+let tc = null;
+cv.addEventListener('touchstart', e => {
+  if (tc){ tapAction(); e.preventDefault(); return; }  /* second finger taps while the first steers */
+  const t = e.changedTouches[0];
+  tc = { id: t.identifier, x: t.clientX, y: t.clientY, x0: t.clientX, y0: t.clientY,
+         t: performance.now(), t0: performance.now(), moved: false, up: 0 };
+  aimX = canvasX(e);
+  e.preventDefault();
+}, { passive: false });
+cv.addEventListener('touchmove', e => {
+  if (!tc) return;
+  let t = null;
+  for (const c of e.touches) if (c.identifier === tc.id) t = c;
+  if (!t) return;
+  const now = performance.now();
+  const dy = t.clientY - tc.y;
+  if (Math.abs(t.clientX - tc.x0) > 9 || Math.abs(t.clientY - tc.y0) > 9) tc.moved = true;
+  tc.up = dy < 0 ? tc.up - dy : 0;
+  if (dy > 4) tc.nudged = false;
+  const vy = dy / Math.max(8, now - tc.t) * 1000;
+  if (!tc.nudged && tc.up > 28 && vy < -420){ nudge(); tc.up = 0; tc.nudged = true; }
+  const r = cv.getBoundingClientRect();
+  aimX = (t.clientX - r.left) * (W / r.width);
+  tc.x = t.clientX; tc.y = t.clientY; tc.t = now;
+  e.preventDefault();
+}, { passive: false });
+cv.addEventListener('touchend', e => {
+  if (!tc){ e.preventDefault(); return; }
+  let ended = false;
+  for (const c of e.changedTouches) if (c.identifier === tc.id) ended = true;
+  if (ended){
+    if (!tc.moved && performance.now() - tc.t0 < 260) tapAction();
+    tc = null;
+  }
+  e.preventDefault();
+}, { passive: false });
 document.addEventListener('keydown', e => {
   if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
   if (e.key === ' ' || e.key === 'ArrowUp'){ padJump(); e.preventDefault(); }
