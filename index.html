@@ -207,6 +207,8 @@
     <div class="tw">
       <label>Paddle feel — <b id="tw-pad-lab"></b></label>
       <input type="range" id="tw-pad" min="15" max="80" step="5" aria-label="Paddle responsiveness">
+      <label style="margin-top:10px">Peg bounce — <b id="tw-bounce-lab"></b></label>
+      <input type="range" id="tw-bounce" min="50" max="92" step="3" aria-label="Peg bounciness">
       <label style="margin-top:10px">Paint scheme</label>
       <div class="twrow" id="tw-theme">
         <button data-th="orchard">Orchard</button><button data-th="midnight">Midnight</button><button data-th="circus">Circus</button><button data-th="copper">Copper</button>
@@ -361,7 +363,7 @@ function buildBoard(seed){
 const DEFAULT_SAVE = {
   coins: 0, best: 0, muted: false,
   up: { hopper: 0, regen: 0, bumper: 0, gold: 0, split: 0, nudge: 0, paddle: 0 },
-  tw: { pad: 60, theme: 'orchard', bumper: 'round' }
+  tw: { pad: 60, theme: 'orchard', bumper: 'round', bounce: 72 }
 };
 /* the paddle: rides above the baskets, follows the mouse */
 const PAD_Y = 566, PAD_H = 9;
@@ -539,8 +541,9 @@ function step(dt){
         b.x = p.x + nx * rr; b.y = p.y + ny * rr;
         const dot = b.vx * nx + b.vy * ny;
         if (dot < 0){
-          b.vx -= (1 + REST_PEG) * dot * nx;
-          b.vy -= (1 + REST_PEG) * dot * ny;
+          const rest = S.tw && S.tw.bounce ? S.tw.bounce / 100 : REST_PEG;
+          b.vx -= (1 + rest) * dot * nx;
+          b.vy -= (1 + rest) * dot * ny;
           b.vx += (R() - 0.5) * 26;   /* a little organic scatter */
           if (p.flash <= 0){ b.score += 1; SFX.peg(); }
           p.flash = 0.12;
@@ -959,10 +962,16 @@ function renderNudge(){
 function padFeelWord(v){
   return v <= 25 ? 'heavy' : v <= 40 ? 'steady' : v <= 60 ? 'lively' : 'lightning';
 }
+function bounceWord(v){
+  return v <= 58 ? 'oaken' : v <= 70 ? 'seasoned' : v <= 82 ? 'rubbery' : 'superball';
+}
 function renderTweaks(){
   const slider = document.getElementById('tw-pad');
   slider.value = S.tw.pad;
   document.getElementById('tw-pad-lab').textContent = padFeelWord(S.tw.pad);
+  const bs = document.getElementById('tw-bounce');
+  bs.value = S.tw.bounce;
+  document.getElementById('tw-bounce-lab').textContent = bounceWord(S.tw.bounce);
   document.querySelectorAll('#tw-theme button').forEach(b =>
     b.setAttribute('aria-pressed', b.getAttribute('data-th') === S.tw.theme ? 'true' : 'false'));
   document.querySelectorAll('#tw-bump button').forEach(b =>
@@ -971,6 +980,11 @@ function renderTweaks(){
 document.getElementById('tw-pad').addEventListener('input', function(){
   S.tw.pad = +this.value;
   document.getElementById('tw-pad-lab').textContent = padFeelWord(S.tw.pad);
+  save();
+});
+document.getElementById('tw-bounce').addEventListener('input', function(){
+  S.tw.bounce = +this.value;
+  document.getElementById('tw-bounce-lab').textContent = bounceWord(S.tw.bounce);
   save();
 });
 document.querySelectorAll('#tw-theme button').forEach(b => {

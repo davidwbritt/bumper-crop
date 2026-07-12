@@ -31,10 +31,7 @@ offline, saves your coins and upgrades in the browser.
   fired back into play, score intact, one save per arming
 - **Drop targets** — knock the bank of three down for a coin burst;
   they stand back up after a spell
-- **The crow** — now and then (1 in 20 drops) a crow swoops in and makes
-  off with an apple in play, golden ones included. A well-timed **NUDGE**
-  startles it into dropping your apple back onto the board. Bird defense
-  is a legitimate use of tilt risk
+- The orchard is said to have wildlife. No further comment.
 
 ## The Tinker's Hatch
 
