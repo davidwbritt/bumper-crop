@@ -22,12 +22,24 @@ offline, saves your coins and upgrades in the browser.
   seconds of dead bumpers and a locked hopper, exactly as tradition
   demands.
 
+## The furniture (real pinball, miniaturized)
+
+- **Pop bumpers** — the toadstools; the kick is the point
+- **Rollovers** — roll through the lanes up top to spell **C·R·O·P**;
+  complete the word and the **kickback** arms
+- **Kickback** — while armed, a ball landing in a lousy ×1 basket gets
+  fired back into play, score intact, one save per arming
+- **Drop targets** — knock the bank of three down for a coin burst;
+  they stand back up after a spell
+
 ## The Tinker's Hatch
 
 Below the shop: free tweaks, saved with your game. **Paddle feel** slider
 (heavy → lightning), four **paint schemes** (Orchard, Midnight, Circus,
-Copper), and **square bumpers** — with true square physics, so flat sides
-kick straight and corners are spicy. Not a reskin; a variant.
+Copper), **square bumpers** — with true square physics, so flat sides
+kick straight and corners are spicy — and **Sell the machine**, a full
+fresh start (coins, upgrades, tweaks, and board bests all cleared;
+the boards themselves are safe in their seeds).
 
 ## Boards are seeded
 
