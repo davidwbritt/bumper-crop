@@ -306,7 +306,11 @@ const SFX = {
   buy(){ tone(700, 0.09, 'triangle', 0.08); setTimeout(() => tone(1050, 0.12, 'triangle', 0.08), 60); },
   nudge(){ tone(90, 0.12, 'square', 0.1, 0.8); },
   tilt(){ tone(120, 0.5, 'sawtooth', 0.1, 0.5); setTimeout(() => tone(90, 0.6, 'sawtooth', 0.09, 0.5), 220); },
-  gold(){ tone(1300, 0.3, 'sine', 0.07, 1.4); }
+  gold(){ tone(1300, 0.3, 'sine', 0.07, 1.4); },
+  caw(){
+    tone(620, 0.14, 'sawtooth', 0.07, 0.6);
+    setTimeout(() => tone(540, 0.16, 'sawtooth', 0.06, 0.55), 130);
+  }
 };
 
 /* ================= the board ================= */
@@ -370,6 +374,8 @@ let regenAt = 0;
 let aimX = W / 2;
 let popups = [];
 let tiltHeat = 0, tiltedUntil = 0, lastNudges = [];
+let crows = [];   /* at most one thief at a time */
+const CROW_CHANCE = 0.05;
 
 function hopperCap(){ return 3 + S.up.hopper; }
 function regenMs(){ return Math.max(900, 4000 * Math.pow(0.85, S.up.regen)); }
@@ -390,6 +396,15 @@ function dropBall(){
   });
   SFX.drop();
   if (golden) SFX.gold();
+  /* somewhere on a wire, a crow takes an interest */
+  if (crows.length === 0 && R() < CROW_CHANCE){
+    crows.push({
+      state: 'wait', delay: 0.7 + R() * 0.9,
+      target: balls[balls.length - 1],
+      x: R() < 0.5 ? -34 : W + 34, y: 0,
+      vx: 0, vy: 0, flap: 0
+    });
+  }
   renderHopper();
 }
 
@@ -414,8 +429,56 @@ function step(dt){
   }
   for (const r of B.rolls) r.flash = Math.max(0, r.flash - dt);
 
+  /* the crow */
+  for (const c of crows){
+    c.flap += dt;
+    if (c.state === 'wait'){
+      c.delay -= dt;
+      if (c.delay <= 0){
+        if (!c.target || c.target.dead || c.target.carried){ c.state = 'gone'; continue; }
+        c.state = 'swoop';
+        c.y = Math.max(30, c.target.y - 120);
+        SFX.caw();
+      }
+    } else if (c.state === 'swoop'){
+      if (!c.target || c.target.dead || c.target.carried || c.target.y > SLOT_TOP - 20){
+        c.state = 'leave';
+      } else {
+        const dx = c.target.x - c.x, dy = (c.target.y - 6) - c.y;
+        const d = Math.max(0.001, Math.hypot(dx, dy));
+        const sp = 340;
+        c.vx = dx / d * sp; c.vy = dy / d * sp;
+        c.x += c.vx * dt; c.y += c.vy * dt;
+        if (d < 14){
+          c.state = 'carry';
+          c.target.carried = true;
+          popup(c.x, c.y - 24, 'A CROW!', 'tilt');
+          SFX.caw();
+        }
+      }
+    } else if (c.state === 'carry'){
+      c.vx += (c.vx >= 0 ? 60 : -60) * dt;
+      if (Math.abs(c.vx) < 90) c.vx = c.vx >= 0 ? 90 : -90;
+      c.vy = -170;
+      c.x += c.vx * dt; c.y += c.vy * dt;
+      if (c.target){ c.target.x = c.x; c.target.y = c.y + 13; }
+      if (c.y < -40 || c.x < -60 || c.x > W + 60){
+        if (c.target){ c.target.dead = true; c.target.carried = false; }
+        popup(Math.max(30, Math.min(W - 30, c.x)), 40, 'stolen.', 'ink');
+        c.state = 'gone';
+      }
+    } else if (c.state === 'leave'){
+      c.vy = -240;
+      c.vx = (c.vx >= 0 ? 1 : -1) * 200;
+      c.x += c.vx * dt; c.y += c.vy * dt;
+      if (c.y < -40 || c.x < -60 || c.x > W + 60) c.state = 'gone';
+    }
+  }
+  crows = crows.filter(c => c.state !== 'gone');
+
   for (const b of balls){
     if (b.dead) continue;
+    if (b.carried){ continue; }   /* in the crow's beak: no physics applies */
     b.vy += GRAV * dt;
     const sp = Math.hypot(b.vx, b.vy);
     if (sp > MAXV){ b.vx = b.vx / sp * MAXV; b.vy = b.vy / sp * MAXV; }
@@ -597,8 +660,20 @@ function nudge(){
   lastNudges.push(now);
   const dir = aimX < W / 2 ? 1 : -1;
   for (const b of balls){
+    if (b.carried) continue;
     b.vx += dir * (110 + R() * 70);
     b.vy -= 70 + R() * 40;
+  }
+  /* a good shake startles the thief */
+  for (const c of crows){
+    if (c.state === 'carry' && c.target){
+      c.target.carried = false;
+      c.target.vx = (R() - 0.5) * 120;
+      c.target.vy = 60;
+      c.target = null;
+      popup(c.x, c.y - 20, 'DROPPED IT!', 'split');
+    }
+    if (c.state === 'swoop' || c.state === 'carry'){ c.state = 'leave'; SFX.caw(); }
   }
   SFX.nudge();
   const cab = document.getElementById('cab');
@@ -778,6 +853,26 @@ function draw(){
     cx.fillStyle = 'rgba(255,255,255,.6)'; cx.fill();
     cx.strokeStyle = T.stem; cx.lineWidth = 1.6;
     cx.beginPath(); cx.moveTo(b.x + 1, b.y - BALL_R + 1); cx.lineTo(b.x + 3.5, b.y - BALL_R - 3); cx.stroke();
+  }
+
+  /* the crow, if one is about */
+  for (const c of crows){
+    if (c.state === 'wait' || c.state === 'gone') continue;
+    const dir = c.vx >= 0 ? 1 : -1;
+    const w = Math.sin(c.flap * 18) * 9;
+    cx.save();
+    cx.translate(c.x, c.y);
+    cx.scale(dir, 1);
+    cx.fillStyle = T.ink;
+    cx.beginPath(); cx.ellipse(0, 0, 11, 5.5, 0, 0, 7); cx.fill();
+    cx.beginPath(); cx.arc(9, -3, 4.5, 0, 7); cx.fill();
+    cx.beginPath(); cx.moveTo(13, -3.5); cx.lineTo(19, -1.5); cx.lineTo(13, -0.5); cx.closePath(); cx.fill();
+    cx.beginPath(); cx.moveTo(-10, 0); cx.lineTo(-17, -3); cx.lineTo(-16, 3); cx.closePath(); cx.fill();
+    cx.beginPath(); cx.moveTo(-2, -2); cx.quadraticCurveTo(-6, -10 - w, -16, -8 - w); cx.quadraticCurveTo(-8, -3, -2, -1); cx.fill();
+    cx.beginPath(); cx.moveTo(2, -2); cx.quadraticCurveTo(6, -10 + w * 0.6, 14, -9 + w * 0.6); cx.quadraticCurveTo(7, -3, 2, -1); cx.fill();
+    cx.fillStyle = T.board;
+    cx.beginPath(); cx.arc(9.5, -3.5, 1.1, 0, 7); cx.fill();
+    cx.restore();
   }
 
   /* score popups */
