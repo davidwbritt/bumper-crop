@@ -38,9 +38,9 @@ offline, saves your coins and upgrades in the browser.
 ## Harvest mode (the finite game)
 
 Toggle **Mode: Harvest** and the orchard closes at the end: apples stack
-visibly in the buckets (8 each), full buckets take a lid and pay nothing,
-and when all seven are full the run ends with a tallied score — total
-coins from exactly 56 landings. Per-board bests are kept, and the #daily
+visibly in the buckets (9 each — three rows of three), full buckets take
+a lid and pay nothing, and when all seven are full the run ends with a
+tallied score — total coins from exactly 63 landings. Per-board bests are kept, and the #daily
 board makes it a shared daily score-attack: same pegs, same buckets,
 whose harvest was bigger? Free play remains the default endless mode.
 

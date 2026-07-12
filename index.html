@@ -437,7 +437,7 @@ function bumperVal(){ return 25 + 12 * S.up.bumper; }
 function goldChance(){ return 0.04 * S.up.gold; }
 function splitChance(){ return 0.05 * S.up.split; }
 function tilted(){ return performance.now() < tiltedUntil; }
-const BUCKET_CAP = 8;
+const BUCKET_CAP = 9;
 function harvestMode(){ return S.tw && S.tw.mode === 'harvest'; }
 function resetHarvest(){
   B.fill = new Array(SLOT_N).fill(0);
@@ -999,7 +999,7 @@ function draw(){
       /* the harvest so far, stacked in the basket */
       const n = Math.min(BUCKET_CAP, B.fill[i]);
       for (let a = 0; a < n; a++){
-        const ax2 = x0 + SLOT_W / 2 + [-17, 0, 17][a % 3] + (Math.floor(a / 3) % 2 ? 8 : 0);
+        const ax2 = x0 + SLOT_W / 2 + [-17, 0, 17][a % 3];
         const ay2 = H - 13 - Math.floor(a / 3) * 11;
         cx.beginPath(); cx.arc(ax2, ay2, 5.5, 0, 7);
         cx.fillStyle = T.ball; cx.fill();
@@ -1247,7 +1247,7 @@ document.getElementById('btn-mode').addEventListener('click', () => {
   save();
   renderMode();
   resetHarvest();
-  toast(harvestMode() ? 'Harvest: fill every bucket — 8 apples each — then the count' : 'Free play: the orchard never closes');
+  toast(harvestMode() ? 'Harvest: fill every bucket — 9 apples each — then the count' : 'Free play: the orchard never closes');
 });
 document.getElementById('hv-again').addEventListener('click', resetHarvest);
 document.getElementById('btn-new').addEventListener('click', () => { location.hash = randomSeed(); });
